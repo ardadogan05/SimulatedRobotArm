@@ -6,7 +6,9 @@ from arms.planar_2link import forward_kinematics
 
 
 def main():
-    base, joint1, end_effector = forward_kinematics(0, np.pi / 4)
+    L2 = 1.0
+    L1 = 1.0 
+    base, joint1, end_effector = forward_kinematics(0, np.pi / 4,L1 = L1, L2 = L2)
     target = np.array([1.0, 1.0])
 
     xvalues = [base[0], joint1[0], end_effector[0]]
@@ -14,7 +16,7 @@ def main():
 
     print(f"End effector position: {end_effector}")
     
-    reach = 2.0
+    reach = L1 + L2
     plot_arm(xvalues, yvalues, reach, target = target)
 
 
