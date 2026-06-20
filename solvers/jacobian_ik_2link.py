@@ -16,9 +16,9 @@ def wrap_to_pi(theta): #to avoid angles > 360 deg or 2 pi
     return (theta + np.pi) % (2 * np.pi) - np.pi 
 
 
-def numerical_solver_2link(target, L1 = 1.0, L2 = 1.0):
+def numerical_solver_2link(target, L1 = 1.0, L2 = 1.0, initial_theta = [0.1, 0.1]):
     target = np.array(target, dtype = float) #incase input for target is an integer or not numpy array
-    theta = np.array([0.1, 0.1]) #inital guesses inside.
+    theta = np.array(initial_theta, dtype = float) #inital guesses inside.
     tolerance = 1e-5
     learning_rate = 0.5 #To avoid overshoot
     max_iterations = 100
@@ -47,13 +47,3 @@ def numerical_solver_2link(target, L1 = 1.0, L2 = 1.0):
         "final_error": error_norm,
         "iterations": max_iterations,
     } #dict to keep track of results
-
-target = np.array([1.0, 1.0])
-theta = numerical_solver_2link(target)["theta"]
-
-_, _, end = forward_kinematics(theta[0], theta[1])
-print("theta raw:", theta)
-print("theta degrees:", np.round(np.degrees(theta), 2))
-print("end:", end)
-print("error:", np.linalg.norm(end - target))
-        
