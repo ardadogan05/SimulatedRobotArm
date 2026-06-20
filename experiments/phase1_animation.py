@@ -1,7 +1,8 @@
-#Just a test file for the animation
-
 import numpy as np
 from visualization.animate_arm import animate_arm
+
+#Experiment file for the animation, should this be moved to tests? 
+
 
 
 def main():
