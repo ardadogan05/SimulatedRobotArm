@@ -1,7 +1,9 @@
 from solvers.analytical_2link import analytical_ik_2link
 from arms.planar_2link import forward_kinematics
 import numpy as np
-#Function that check if the analyical solution of IK falls within the margin of error when compared with FK
+
+#run "python -m pytest" in terminal to test.
+#A couple of checks to ensure everything is working
 
 def test_reachable_targets_reach_correct_position():
     targets = [
