@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .venv/
+data/processed/*.npz
+models/saved/*.pt
+models/saved/*.pth
