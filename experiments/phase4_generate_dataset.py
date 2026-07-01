@@ -1,6 +1,8 @@
-from data.generate_2link_dataset import generate_2link_dataset
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+
+from data.generate_2link_dataset import generate_2link_dataset
 
 def plot_dataset(X):
     plt.scatter(X[:, 0], X[:, 1], s=1)
@@ -52,6 +54,7 @@ def main():
     print("theta2 range:", Y[:, 1].min(), Y[:, 1].max())
 
     # Save split dataset
+    Path("data/processed").mkdir(parents=True, exist_ok=True)
     np.savez(
         "data/processed/ik_2link_dataset.npz",
         X_train=X_train,

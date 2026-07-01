@@ -16,8 +16,11 @@ def wrap_to_pi(theta): #to avoid angles > 360 deg or 2 pi
     return (theta + np.pi) % (2 * np.pi) - np.pi 
 
 
-def numerical_solver_2link(target, L1 = 1.0, L2 = 1.0, initial_theta = [0.1, 0.1]):
+def numerical_solver_2link(target, L1 = 1.0, L2 = 1.0, initial_theta = None):
     target = np.array(target, dtype = float) #incase input for target is an integer or not numpy array
+    # If no initial guess is given, use a small default bend. If the user gives one, use that instead.
+    if initial_theta is None:
+        initial_theta = [0.1, 0.1]
     theta = np.array(initial_theta, dtype = float) #inital guesses inside.
     tolerance = 1e-5
     learning_rate = 0.5 #To avoid overshoot
