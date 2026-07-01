@@ -5,6 +5,7 @@ import torch
 
 from arms.planar_2link import forward_kinematics
 from models.neural_ik_2link import NeuralIK2Link
+from training.torch_utils import get_torch_device
 
 
 def main():
@@ -18,12 +19,7 @@ def main():
     Y_test = data["Y_test"]
 
     #Uses gpu if availabe, cpu otherwise
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
+    device = get_torch_device()
 
     print("Using device:", device)
 
