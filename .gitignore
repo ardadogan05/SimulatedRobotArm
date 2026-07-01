@@ -5,3 +5,4 @@ __pycache__/
 data/processed/*.npz
 models/saved/*.pt
 models/saved/*.pth
+results/phase4/*.npz
