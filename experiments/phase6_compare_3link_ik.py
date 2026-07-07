@@ -1,8 +1,7 @@
-import sys
-from pathlib import Path
 import numpy as np
+
 from arms.planar_3link import forward_kinematics_3link
-from solvers.jacobian_ik_3link import numerical_solver_3link, dls_solver_3link
+from solvers.jacobian_ik_3link import dls_solver_3link, numerical_solver_3link
 from visualization.plot_arm import plot_arm
 
 
@@ -43,6 +42,7 @@ def plot_solution(result, target, title):
     print(f"Showing plot: {title}")
     plot_arm(xvalues, yvalues, reach, target=target)
 
+
 def run_random_sanity_check(num_targets=100):
     np.random.seed(0)
 
@@ -61,14 +61,12 @@ def run_random_sanity_check(num_targets=100):
     dls_iterations = []
 
     for _ in range(num_targets):
-        radius = max_reach * np.sqrt(np.random.rand()) #generates random radius within reach
-        angle = np.random.uniform(-np.pi, np.pi) 
+        #generates random radius within reach
+        radius = max_reach * np.sqrt(np.random.rand())
+        angle = np.random.uniform(-np.pi, np.pi)
 
         #target converted from polar to cartesian
-        target = np.array([
-            radius * np.cos(angle),
-            radius * np.sin(angle),
-        ])
+        target = np.array([radius * np.cos(angle), radius * np.sin(angle)])
 
         initial_theta = np.random.uniform(-np.pi, np.pi, size=3)
 
@@ -97,11 +95,14 @@ def run_random_sanity_check(num_targets=100):
     print("--------------------------")
     print(f"Targets tested: {num_targets}")
     print()
-    print(f"Pseudoinverse success rate: {100 * pseudoinverse_successes / num_targets:.1f}%")
+    pseudoinverse_success_rate = 100 * pseudoinverse_successes / num_targets
+    dls_success_rate = 100 * dls_successes / num_targets
+
+    print(f"Pseudoinverse success rate: {pseudoinverse_success_rate:.1f}%")
     print(f"Pseudoinverse mean error:   {np.mean(pseudoinverse_errors):.8f}")
     print(f"Pseudoinverse mean iters:   {np.mean(pseudoinverse_iterations):.2f}")
     print()
-    print(f"DLS success rate:           {100 * dls_successes / num_targets:.1f}%")
+    print(f"DLS success rate:           {dls_success_rate:.1f}%")
     print(f"DLS mean error:             {np.mean(dls_errors):.8f}")
     print(f"DLS mean iters:             {np.mean(dls_iterations):.2f}")
     print()

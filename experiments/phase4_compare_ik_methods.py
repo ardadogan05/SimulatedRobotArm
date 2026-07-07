@@ -48,9 +48,9 @@ def summarize_errors(name, errors):
 
 
 def main():
-    dataset_path = Path("data/processed/ik_2link_dataset.npz") #path for the data used for testing
+    #path for the data used for testing
+    dataset_path = Path("data/processed/ik_2link_dataset.npz")
     model_path = Path("models/saved/neural_ik_2link.pt") #model that is used
-
 
     data = np.load(dataset_path)
 
@@ -92,7 +92,6 @@ def main():
                 end_effector_error(theta_analytical, target_xy)
             )
 
-        
         # Numerical IK
         initial_theta = np.array([0.0, 0.0])
 

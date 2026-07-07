@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 
+
 def plot_arm(xvalues, yvalues, reach, target=None):
     if target is not None:
         plt.scatter(target[0], target[1], marker="x", label="Target")

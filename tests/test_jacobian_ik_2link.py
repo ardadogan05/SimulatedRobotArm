@@ -1,19 +1,23 @@
-from solvers.jacobian_ik_2link import jacobian_2link, numerical_solver_2link
-from arms.planar_2link import forward_kinematics
 import numpy as np
+
+from arms.planar_2link import forward_kinematics
+from solvers.jacobian_ik_2link import jacobian_2link, numerical_solver_2link
 
 #run "python -m pytest" in terminal to test.
 
 
 def test_jacobian_at_stretched_configuration(): #test for jacobian matrix
-    J = jacobian_2link(0.0, 0.0, L1 = 1.0, L2 = 1.0)
+    J = jacobian_2link(0.0, 0.0, L1=1.0, L2=1.0)
 
-    expected = np.array([
-        [0.0, 0.0],
-        [2.0, 1.0],
-    ])
+    expected = np.array(
+        [
+            [0.0, 0.0],
+            [2.0, 1.0],
+        ]
+    )
 
     assert np.allclose(J, expected)
+
 
 def test_numerical_ik_reaches_simple_target():
     target = np.array([1.0, 1.0])
@@ -26,6 +30,7 @@ def test_numerical_ik_reaches_simple_target():
     error = np.linalg.norm(end_effector - target)
 
     assert error < 1e-5
+
 
 def test_numerical_ik_reaches_multiple_targets():
     targets = [

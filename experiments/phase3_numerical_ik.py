@@ -1,16 +1,19 @@
+import numpy as np
+
 from solvers.analytical_2link import analytical_ik_2link
 from solvers.jacobian_ik_2link import numerical_solver_2link
-import numpy as np
 
 
 def print_result(target, result, analytical):
     print("target:", target)
-    print("analytical:", "reachable" if analytical is not None else "unreachable") #analytical returns None if no solution, uses this
+    #analytical returns None if no solution, uses this
+    print("analytical:", "reachable" if analytical is not None else "unreachable")
     print("numerical success:", result["success"])
     print("numerical final error:", result["final_error"])
     print("numerical iterations:", result["iterations"])
     print("numerical theta:", np.round(result["theta"], 4))
     print()
+
 
 def main():
     targets = [

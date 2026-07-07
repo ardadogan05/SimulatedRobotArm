@@ -1,8 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 from data.generate_2link_dataset import generate_2link_dataset
+
 
 def plot_dataset(X):
     plt.scatter(X[:, 0], X[:, 1], s=1)
@@ -12,7 +14,8 @@ def plot_dataset(X):
     plt.title("2-link IK dataset target positions")
     plt.show()
 
-def split_dataset(X,Y): #Will use 40k for training, 5k for val and 5k for test.
+
+def split_dataset(X, Y): #Will use 40k for training, 5k for val and 5k for test.
     indices = np.random.permutation(len(X)) #random shuffle of indices
 
     train_end = int(0.8 * len(X)) #80% of data goes to training
@@ -27,7 +30,6 @@ def split_dataset(X,Y): #Will use 40k for training, 5k for val and 5k for test.
     X_test, Y_test = X[test_idx], Y[test_idx]
 
     return X_train, Y_train, X_val, Y_val, X_test, Y_test
-
 
 
 def main():
@@ -67,6 +69,7 @@ def main():
 
     # Plot full generated dataset
     plot_dataset(X)
+
 
 if __name__ == "__main__":
     main()

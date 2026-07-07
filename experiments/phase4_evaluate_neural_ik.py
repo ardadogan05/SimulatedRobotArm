@@ -9,7 +9,8 @@ from training.torch_utils import get_torch_device
 
 
 def main():
-    dataset_path = Path("data/processed/ik_2link_dataset.npz") #path for the data used for testing
+    #path for the data used for testing
+    dataset_path = Path("data/processed/ik_2link_dataset.npz")
     model_path = Path("models/saved/neural_ik_2link.pt") #model that is used
 
     #Loading the data
@@ -36,11 +37,12 @@ def main():
         Y_pred_tensor = model(X_test_tensor)
 
     #Converts the tensor to regular numbers for further use
-    Y_pred = Y_pred_tensor.cpu().numpy() 
+    Y_pred = Y_pred_tensor.cpu().numpy()
 
     angle_errors = np.linalg.norm(Y_pred - Y_test, axis=1)
 
-    #Creates an np array with end effector errors. Allows us to use functions like mean, median max etc.
+    #Creates an np array with end effector errors.
+    #Allows us to use functions like mean, median max etc.
     ee_errors = []
 
     for target_xy, pred_theta in zip(X_test, Y_pred):
@@ -62,8 +64,6 @@ def main():
     print(f"Mean EE error:      {np.mean(ee_errors):.6f}")
     print(f"Median EE error:    {np.median(ee_errors):.6f}")
     print(f"Max EE error:       {np.max(ee_errors):.6f}")
-
-    
 
 
 if __name__ == "__main__":

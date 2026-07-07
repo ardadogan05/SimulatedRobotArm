@@ -1,9 +1,11 @@
+import numpy as np
+
 from solvers.analytical_2link import analytical_ik_2link
 from arms.planar_2link import forward_kinematics
-import numpy as np
 
 #run "python -m pytest" in terminal to test.
 #A couple of checks to ensure everything is working
+
 
 def test_reachable_targets_reach_correct_position():
     targets = [
@@ -23,7 +25,7 @@ def test_reachable_targets_reach_correct_position():
 
             error = np.linalg.norm(np.array(end_effector) - np.array(target))
 
-            assert error < 1e-9 #stops and throws error unless criteria is met. 
+            assert error < 1e-9 #stops and throws error unless criteria is met.
 
 
 def test_unreachable_target_returns_none():
