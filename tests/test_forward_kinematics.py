@@ -1,6 +1,9 @@
 import numpy as np
+
 from arms.planar_2link import forward_kinematics
+
 #run "python -m pytest" in terminal to test.
+
 
 def test_forward_kinematics_stretched_arm():
     _, joint1, end_effector = forward_kinematics(0.0, 0.0, L1=1.0, L2=1.0)

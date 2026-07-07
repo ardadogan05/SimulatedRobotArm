@@ -1,6 +1,11 @@
 import numpy as np
-from solvers.jacobian_ik_3link import jacobian_3link, numerical_solver_3link, dls_solver_3link
+
 from arms.planar_3link import forward_kinematics_3link
+from solvers.jacobian_ik_3link import (
+    dls_solver_3link,
+    jacobian_3link,
+    numerical_solver_3link,
+)
 
 
 def test_jacobian_3link_shape():
@@ -12,10 +17,12 @@ def test_jacobian_3link_shape():
 def test_jacobian_3link_straight_configuration():
     J = jacobian_3link(0.0, 0.0, 0.0)
 
-    expected = np.array([
-        [0.0, 0.0, 0.0],
-        [3.0, 2.0, 1.0],
-    ])
+    expected = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [3.0, 2.0, 1.0],
+        ]
+    )
 
     assert np.allclose(J, expected)
 
@@ -42,6 +49,7 @@ def test_numerical_solver_3link_solution_matches_forward_kinematics():
     )
 
     assert np.allclose(end_effector, target, atol=1e-5)
+
 
 def test_dls_solver_3link_reaches_target():
     target = np.array([1.5, 1.5])
