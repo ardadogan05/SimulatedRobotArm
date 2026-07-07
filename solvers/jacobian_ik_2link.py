@@ -1,5 +1,6 @@
 import numpy as np
 from arms.planar_2link import forward_kinematics
+from solvers.utils import wrap_to_pi
 
 
 
@@ -11,9 +12,6 @@ def jacobian_2link(theta1, theta2, L1 = 1.0, L2 = 1.0):
     dytheta2 = L2*np.cos(theta1 + theta2)
 
     return np.array([[dxtheta1, dxtheta2],[dytheta1, dytheta2]])
-
-def wrap_to_pi(theta): #to avoid angles > 360 deg or 2 pi
-    return (theta + np.pi) % (2 * np.pi) - np.pi 
 
 
 def numerical_solver_2link(target, L1 = 1.0, L2 = 1.0, initial_theta = None):
