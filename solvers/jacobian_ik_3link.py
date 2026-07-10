@@ -78,6 +78,45 @@ def numerical_solver_3link(target, L1=1.0, L2=1.0, L3=1.0, initial_theta=None):
     } #dict to keep track of results
 
 
+def dls_step_3link(
+    target,
+    theta,
+    L1=1.0,
+    L2=1.0,
+    L3=1.0,
+    damping=0.1,
+    learning_rate=0.5,
+    tolerance=1e-5,
+):
+    #calculates one DLS movement instead of solving all the way to the target
+    target = np.array(target, dtype=float)
+    theta = np.array(theta, dtype=float)
+
+    current_position = forward_kinematics_3link(
+        theta[0],
+        theta[1],
+        theta[2],
+        L1=L1,
+        L2=L2,
+        L3=L3,
+    )[3]
+    #direction and distance from the current position to the target
+    error = target - current_position
+    error_norm = np.linalg.norm(error)
+
+    #no movement is needed if the arm is already close enough
+    if error_norm < tolerance:
+        return np.zeros(3), error_norm
+
+    J = jacobian_3link(theta[0], theta[1], theta[2], L1=L1, L2=L2, L3=L3)
+    I = np.eye(2)
+    #damping keeps the matrix stable around difficult arm positions
+    delta_theta = J.T @ np.linalg.inv(J @ J.T + damping**2 * I) @ error
+
+    #smaller step helps avoid overshooting the target
+    return learning_rate * delta_theta, error_norm
+
+
 def dls_solver_3link(
     target,
     L1=1.0,
@@ -98,16 +137,17 @@ def dls_solver_3link(
     max_iterations = 200
 
     for i in range(max_iterations):
-        current_position = forward_kinematics_3link(
-            theta[0],
-            theta[1],
-            theta[2],
+        #repeats the same single step used when generating the NN dataset
+        delta_theta, error_norm = dls_step_3link(
+            target,
+            theta,
             L1=L1,
             L2=L2,
             L3=L3,
-        )[3]
-        error = target - current_position
-        error_norm = np.linalg.norm(error)
+            damping=damping,
+            learning_rate=learning_rate,
+            tolerance=tolerance,
+        )
 
         if error_norm < tolerance:
             return {
@@ -117,11 +157,7 @@ def dls_solver_3link(
                 "iterations": i + 1,
             }
 
-        J = jacobian_3link(theta[0], theta[1], theta[2], L1=L1, L2=L2, L3=L3)
-        I = np.eye(2)
-        delta_theta = J.T @ np.linalg.inv(J @ J.T + damping**2 * I) @ error
-
-        theta = theta + learning_rate * delta_theta
+        theta = theta + delta_theta
         theta = wrap_to_pi(theta)
 
     _, _, _, current_position = forward_kinematics_3link(
@@ -141,4 +177,3 @@ def dls_solver_3link(
         "final_error": final_error,
         "iterations": max_iterations,
     }
-
