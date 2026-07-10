@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .venv/
+.agents/
 data/processed/*.npz
 models/saved/*.pt
 models/saved/*.pth

@@ -4,6 +4,9 @@ import numpy as np
 
 from solvers.jacobian_ik_3link import dls_step_3link
 
+#Idea for this NN is to give us delta theta, so that we get closer to target
+#This is done repeatedly until we have reached the target, essentially mimicking each step of the DLS numerical method.
+
 
 def generate_3link_dataset(N):
     X = np.zeros((N, 5))  # inputs: target x, target y, current theta
