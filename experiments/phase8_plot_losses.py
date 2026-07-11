@@ -14,7 +14,7 @@ def plot_losses(epochs, train_losses, val_losses, output_path, log_scale=False):
     ax.plot(epochs, val_losses, label="Validation loss")
 
     ax.set_xlabel("Epoch")
-    ax.set_ylabel("MSE loss")
+    ax.set_ylabel("Combined loss")
 
     if log_scale:
         ax.set_title("3-link Neural IK Policy Training Loss, Log Scale")

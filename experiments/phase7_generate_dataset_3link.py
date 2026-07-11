@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 
 from arms.planar_3link import forward_kinematics_3link
-from data.dataset_utils import split_dataset
 from data.generate_3link_dataset import generate_3link_dataset
 
 #Generates and saves the training data, then checks that the DLS steps work.
@@ -20,14 +19,18 @@ def end_effector(theta):
 
 
 def main():
-    # Generate dataset
-    X, Y = generate_3link_dataset(50_000)
+    #Generate each split separately so one DLS trajectory cannot leak
+    #between training, validation and testing
+    X_train, Y_train = generate_3link_dataset(160_000)
+    X_val, Y_val = generate_3link_dataset(20_000)
 
-    # Split dataset
-    X_train, Y_train, X_val, Y_val, X_test, Y_test = split_dataset(X, Y)
+    #One step per rollout means every test row is a fresh random IK problem
+    X_test, Y_test = generate_3link_dataset(
+        20_000,
+        max_steps_per_rollout=1,
+    )
 
-    print("X shape:", X.shape)
-    print("Y shape:", Y.shape)
+    print("Total samples:", len(X_train) + len(X_val) + len(X_test))
 
     print("X_train shape:", X_train.shape)
     print("Y_train shape:", Y_train.shape)
@@ -58,10 +61,10 @@ def main():
 
     for i in range(num_sanity_samples):
         #cartesian coordinates of target
-        target = X[i, 0:2]
-        theta_before = X[i, 2:5]
+        target = X_test[i, 0:2]
+        theta_before = X_test[i, 2:5]
         #delta_theta from DLS solver
-        delta_theta = Y[i]
+        delta_theta = Y_test[i]
 
         theta_after = theta_before + delta_theta
 

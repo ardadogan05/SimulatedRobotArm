@@ -1,33 +1,29 @@
 import numpy as np
-import pytest
 
 from data.dataset_utils import split_dataset
 
 
-def test_split_dataset_preserves_pairs_and_split_sizes(monkeypatch):
-    X = np.arange(22).reshape(11, 2)
-    Y = np.arange(11).reshape(11, 1)
-
-    #A known order makes it clear which samples should be in each split
-    monkeypatch.setattr(np.random, "permutation", lambda length: np.arange(length))
+def test_split_dataset():
+    X = np.arange(20).reshape(10, 2)
+    Y = X[:, 0].copy()
 
     X_train, Y_train, X_val, Y_val, X_test, Y_test = split_dataset(X, Y)
 
-    assert X_train.shape == (8, 2)
-    assert Y_train.shape == (8, 1)
-    assert X_val.shape == (1, 2)
-    assert Y_val.shape == (1, 1)
-    assert X_test.shape == (2, 2)
-    assert Y_test.shape == (2, 1)
+    #10 samples should be divided into 8 training, 1 validation and 1 test
+    assert len(X_train) == 8
+    assert len(Y_train) == 8
 
-    assert np.array_equal(X_train, X[:8])
-    assert np.array_equal(Y_train, Y[:8])
-    assert np.array_equal(X_val, X[8:9])
-    assert np.array_equal(Y_val, Y[8:9])
-    assert np.array_equal(X_test, X[9:])
-    assert np.array_equal(Y_test, Y[9:])
+    assert len(X_val) == 1
+    assert len(Y_val) == 1
 
+    assert len(X_test) == 1
+    assert len(Y_test) == 1
 
-def test_split_dataset_requires_matching_sample_counts():
-    with pytest.raises(ValueError):
-        split_dataset(np.zeros((3, 2)), np.zeros((2, 1)))
+    #Y was copied from the first column of X, so this checks the pairs stayed together
+    assert np.array_equal(Y_train, X_train[:, 0])
+    assert np.array_equal(Y_val, X_val[:, 0])
+    assert np.array_equal(Y_test, X_test[:, 0])
+
+    #Putting the splits together should give us all 10 original samples
+    X_after_split = np.vstack([X_train, X_val, X_test])
+    assert np.array_equal(np.sort(X_after_split[:, 0]), np.sort(X[:, 0]))

@@ -16,6 +16,8 @@ def train_neural_ik(
     n_epochs=100,
     batch_size=128,
     learning_rate=1e-3,
+    task_loss_fn=None,
+    task_loss_weight=0.0,
 ):
     #Allows training to happen on GPU if possible, otherwise fallback to CPU.
     #Gives faster speeds (not that important for these small NNs)
@@ -84,6 +86,13 @@ def train_neural_ik(
 
             loss = loss_fn(predictions, Y_batch)
 
+            #An optional task loss can also measure what the prediction physically does
+            if task_loss_fn is not None:
+                loss = loss + task_loss_weight * task_loss_fn(
+                    predictions,
+                    X_batch,
+                )
+
             #Backpropagation based on the loss function
             #Forgets gradients from previous batch (pytorch accumulates by default)
             optimizer.zero_grad()
@@ -105,6 +114,10 @@ def train_neural_ik(
         with torch.no_grad(): #turns off gradient tracking, this part is strictly eval
             val_predictions = model(X_val)
             val_loss = loss_fn(val_predictions, Y_val).item()
+
+            if task_loss_fn is not None:
+                val_task_loss = task_loss_fn(val_predictions, X_val).item()
+                val_loss += task_loss_weight * val_task_loss
 
         print(
             f"Epoch {epoch + 1:03d} | "
