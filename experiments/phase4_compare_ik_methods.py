@@ -49,14 +49,25 @@ def summarize_errors(name, errors, total_time, num_samples):
     }
 
 
-def main():
+def main(use_dataset=True):
     #path for the data used for testing
     dataset_path = Path("data/processed/ik_2link_dataset.npz")
     model_path = Path("models/saved/neural_ik_2link.pt") #model that is used
 
-    data = np.load(dataset_path)
-
-    X_test = data["X_test"]
+    if use_dataset and dataset_path.exists():
+        data = np.load(dataset_path)
+        X_test = data["X_test"]
+    else:
+        # Recreate deterministic, reachable targets so the published model can
+        # be benchmarked without the large training dataset.
+        rng = np.random.default_rng(42)
+        # Match the published model's documented training domain.
+        theta1 = rng.uniform(-np.pi / 2, np.pi / 2, size=1000)
+        theta2 = rng.uniform(0.0, np.pi, size=1000)
+        X_test = np.array([
+            forward_kinematics(t1, t2)[2]
+            for t1, t2 in zip(theta1, theta2)
+        ])
 
     #Uses gpu if availabe, cpu otherwise
     device = get_torch_device()

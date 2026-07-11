@@ -4,7 +4,11 @@ __pycache__/
 .venv/
 .agents/
 data/processed/*.npz
+# Trained weights are intentionally versioned so benchmarks run after clone.
+# Ignore ad-hoc checkpoints while explicitly publishing the final two models.
 models/saved/*.pt
 models/saved/*.pth
+!models/saved/neural_ik_2link.pt
+!models/saved/neural_ik_3link.pt
 results/phase4/*.npz
 results/phase8/*.npz

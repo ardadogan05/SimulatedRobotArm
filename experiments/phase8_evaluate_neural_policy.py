@@ -13,7 +13,7 @@ from models.neural_ik_3link import NeuralIK3Link
 from solvers.jacobian_ik_3link import dls_solver_3link, numerical_solver_3link
 from solvers.neural_ik_3link import neural_solver_3link
 from training.torch_utils import get_torch_device
-from visualization.animate_arm import animate_3link_solver_comparison
+from visualization.animate_arm import animate_3link_solver_examples
 
 
 def print_result(result, target, tolerance):
@@ -87,7 +87,31 @@ def plot_rollout(result, target, output_path):
     plt.close(fig)
 
 
-def summarize_results(name, errors, successes, iterations, solve_times):
+def end_effector_path_ratio(result, target):
+    """Return travelled Cartesian distance divided by straight-line distance."""
+    positions = np.array([
+        forward_kinematics_3link(*theta)[3]
+        for theta in result["theta_history"]
+    ])
+    travelled_distance = np.linalg.norm(
+        np.diff(positions, axis=0), axis=1
+    ).sum()
+    straight_line_distance = np.linalg.norm(target - positions[0])
+
+    if straight_line_distance < 1e-12:
+        return 1.0
+
+    return travelled_distance / straight_line_distance
+
+
+def summarize_results(
+    name,
+    errors,
+    successes,
+    iterations,
+    solve_times,
+    common_success_path_ratios,
+):
     errors = np.array(errors)
 
     return {
@@ -98,6 +122,11 @@ def summarize_results(name, errors, successes, iterations, solve_times):
         "max_error": np.max(errors),
         "mean_iterations": np.mean(iterations),
         "mean_time_ms": 1000 * np.mean(solve_times),
+        "mean_path_ratio": (
+            np.mean(common_success_path_ratios)
+            if common_success_path_ratios
+            else np.nan
+        ),
     }
 
 
@@ -118,6 +147,16 @@ def compare_methods(model, X_test, tolerance, max_iterations):
     pseudoinverse_times = []
     dls_times = []
     neural_times = []
+
+    # Path shape is compared only where every method succeeds, so a failed
+    # rollout cannot make one method look artificially direct or indirect.
+    common_success_path_ratios = {
+        "Pseudoinverse IK": [],
+        "DLS IK": [],
+        "Neural policy": [],
+    }
+    neural_fewer_steps_than_pseudoinverse = 0
+    neural_fewer_steps_than_dls = 0
 
     #Same as the 2-link comparison: use 1000 samples from the test dataset
     num_samples = min(1000, len(X_test))
@@ -171,6 +210,28 @@ def compare_methods(model, X_test, tolerance, max_iterations):
         neural_errors.append(neural_result["final_error"])
         neural_iterations.append(neural_result["iterations"])
 
+        if (
+            pseudoinverse_result["success"]
+            and dls_result["success"]
+            and neural_result["success"]
+        ):
+            common_success_path_ratios["Pseudoinverse IK"].append(
+                end_effector_path_ratio(pseudoinverse_result, target)
+            )
+            common_success_path_ratios["DLS IK"].append(
+                end_effector_path_ratio(dls_result, target)
+            )
+            common_success_path_ratios["Neural policy"].append(
+                end_effector_path_ratio(neural_result, target)
+            )
+            neural_fewer_steps_than_pseudoinverse += (
+                neural_result["iterations"]
+                < pseudoinverse_result["iterations"]
+            )
+            neural_fewer_steps_than_dls += (
+                neural_result["iterations"] < dls_result["iterations"]
+            )
+
     summaries = [
         summarize_results(
             "Pseudoinverse IK",
@@ -178,6 +239,7 @@ def compare_methods(model, X_test, tolerance, max_iterations):
             pseudoinverse_successes,
             pseudoinverse_iterations,
             pseudoinverse_times,
+            common_success_path_ratios["Pseudoinverse IK"],
         ),
         summarize_results(
             "DLS IK",
@@ -185,6 +247,7 @@ def compare_methods(model, X_test, tolerance, max_iterations):
             dls_successes,
             dls_iterations,
             dls_times,
+            common_success_path_ratios["DLS IK"],
         ),
         summarize_results(
             "Neural policy",
@@ -192,6 +255,7 @@ def compare_methods(model, X_test, tolerance, max_iterations):
             neural_successes,
             neural_iterations,
             neural_times,
+            common_success_path_ratios["Neural policy"],
         ),
     ]
 
@@ -207,6 +271,7 @@ def compare_methods(model, X_test, tolerance, max_iterations):
         f"{'Median':>10} "
         f"{'Max error':>12} "
         f"{'Mean steps':>11} "
+        f"{'Path ratio':>11} "
         f"{'Mean ms':>10}"
     )
 
@@ -218,20 +283,34 @@ def compare_methods(model, X_test, tolerance, max_iterations):
             f"{summary['median_error']:>10.6f} "
             f"{summary['max_error']:>12.6f} "
             f"{summary['mean_iterations']:>11.2f} "
+            f"{summary['mean_path_ratio']:>11.3f} "
             f"{summary['mean_time_ms']:>10.3f}"
         )
 
+    common_successes = len(common_success_path_ratios["Neural policy"])
+    print()
+    print(
+        "Path ratio = travelled end-effector distance / straight-line distance; "
+        "1.0 is perfectly direct."
+    )
+    print(
+        f"Path ratios and step-win rates use the {common_successes} cases "
+        "solved by all three methods."
+    )
+    if common_successes:
+        print(
+            "Neural policy used fewer steps than pseudoinverse in "
+            f"{100 * neural_fewer_steps_than_pseudoinverse / common_successes:.1f}% "
+            "of those cases and fewer than DLS in "
+            f"{100 * neural_fewer_steps_than_dls / common_successes:.1f}%."
+        )
 
-def main():
+
+def main(use_dataset=True):
     dataset_path = Path("data/processed/ik_3link_dataset.npz")
     model_path = Path("models/saved/neural_ik_3link.pt")
     output_path = Path("results/phase8/neural_policy_rollout.png")
     animation_path = Path("results/phase8/ik_3link_solver_comparison.gif")
-
-    if not dataset_path.exists():
-        raise FileNotFoundError(
-            "Generate the 3-link dataset before running the comparison"
-        )
 
     if not model_path.exists():
         raise FileNotFoundError(
@@ -246,8 +325,19 @@ def main():
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
-    data = np.load(dataset_path)
-    X_test = data["X_test"]
+    if use_dataset and dataset_path.exists():
+        data = np.load(dataset_path)
+        X_test = data["X_test"]
+    else:
+        # A deterministic benchmark means published weights can be evaluated
+        # without downloading the much larger training dataset.
+        rng = np.random.default_rng(42)
+        target_theta = rng.uniform(-np.pi, np.pi, size=(1000, 3))
+        targets = np.array([
+            forward_kinematics_3link(*theta)[3] for theta in target_theta
+        ])
+        initial_thetas = rng.uniform(-np.pi, np.pi, size=(1000, 3))
+        X_test = np.column_stack([targets, initial_thetas])
 
     tolerance = 0.05
     max_iterations = 100
@@ -270,30 +360,38 @@ def main():
     print(f"Saved rollout plot to: {output_path}")
     print()
 
-    pseudoinverse_result = numerical_solver_3link(
-        target,
-        initial_theta=initial_theta,
-        tolerance=tolerance,
-        max_iterations=max_iterations,
-    )
-    dls_result = dls_solver_3link(
-        target,
-        initial_theta=initial_theta,
-        damping=0.1,
-        tolerance=tolerance,
-        max_iterations=max_iterations,
-    )
+    examples = []
+    for example_target, example_initial_theta in [
+        (target, initial_theta),
+        (np.array([-1.5, 1.25]), np.array([0.4, -0.5, 0.2])),
+    ]:
+        examples.append({
+            "target": example_target,
+            "results": {
+                "Pseudoinverse IK": numerical_solver_3link(
+                    example_target,
+                    initial_theta=example_initial_theta,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                ),
+                "DLS IK": dls_solver_3link(
+                    example_target,
+                    initial_theta=example_initial_theta,
+                    damping=0.1,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                ),
+                "Neural policy": neural_solver_3link(
+                    model,
+                    example_target,
+                    initial_theta=example_initial_theta,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                ),
+            },
+        })
 
-    animation_results = {
-        "Pseudoinverse IK": pseudoinverse_result,
-        "DLS IK": dls_result,
-        "Neural policy": result,
-    }
-    animate_3link_solver_comparison(
-        animation_results,
-        target,
-        animation_path,
-    )
+    animate_3link_solver_examples(examples, animation_path)
     print(f"Saved solver animation to: {animation_path}")
     print()
 
