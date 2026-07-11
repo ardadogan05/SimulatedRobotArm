@@ -1,4 +1,5 @@
-matplotlib
-numpy
-pytest
-torch
+matplotlib==3.11.0
+numpy==2.5.1
+pillow==12.3.0
+pytest==9.1.1
+torch==2.13.0

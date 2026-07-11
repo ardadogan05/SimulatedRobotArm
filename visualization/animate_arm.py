@@ -58,44 +58,66 @@ def animate_3link_solver_comparison(
     output_path,
     interval=250,
 ):
-    method_names = list(results.keys())
-    num_frames = max(
-        len(results[method_name]["theta_history"])
-        for method_name in method_names
+    """Animate one comparison (kept as a backwards-compatible convenience)."""
+    return animate_3link_solver_examples(
+        [{"target": target, "results": results}],
+        output_path,
+        interval=interval,
     )
+
+
+def animate_3link_solver_examples(examples, output_path, interval=250):
+    """Animate multiple solver examples sequentially in a single GIF."""
+    if not examples:
+        raise ValueError("At least one solver example is required")
+
+    method_names = list(examples[0]["results"].keys())
+    frame_counts = [
+        max(
+            len(example["results"][method_name]["theta_history"])
+            for method_name in method_names
+        )
+        for example in examples
+    ]
+    frame_offsets = np.cumsum([0, *frame_counts])
 
     fig, axes = plt.subplots(1, len(method_names), figsize=(15, 5))
     arm_lines = []
     path_lines = []
+    target_markers = []
+    title_texts = []
 
     for ax, method_name in zip(axes, method_names):
-        result = results[method_name]
-
         (arm_line,) = ax.plot([], [], marker="o", linewidth=3)
         (path_line,) = ax.plot([], [], marker=".", alpha=0.6)
+        target_marker = ax.scatter([], [], marker="x", s=100, label="Target")
 
         arm_lines.append(arm_line)
         path_lines.append(path_line)
+        target_markers.append(target_marker)
+        title_texts.append(ax.set_title(method_name))
 
-        ax.scatter(target[0], target[1], marker="x", s=100, label="Target")
         ax.set_xlim(-3.2, 3.2)
         ax.set_ylim(-3.2, 3.2)
         ax.set_aspect("equal", adjustable="box")
         ax.grid(True)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-        ax.set_title(
-            f"{method_name}\n"
-            f"Success: {result['success']} | Steps: {result['iterations']}"
-        )
         ax.legend()
 
     def update(frame):
         updated_lines = []
+        example_index = int(np.searchsorted(frame_offsets[1:], frame, side="right"))
+        example_index = min(example_index, len(examples) - 1)
+        example = examples[example_index]
+        results = example["results"]
+        target = np.asarray(example["target"])
+        example_frame = frame - frame_offsets[example_index]
 
         for i, method_name in enumerate(method_names):
+            result = results[method_name]
             theta_history = results[method_name]["theta_history"]
-            current_frame = min(frame, len(theta_history) - 1)
+            current_frame = min(example_frame, len(theta_history) - 1)
             theta = theta_history[current_frame]
 
             arm_points = np.array(
@@ -122,15 +144,22 @@ def animate_3link_solver_comparison(
                 end_effector_path[:, 0],
                 end_effector_path[:, 1],
             )
+            target_markers[i].set_offsets(target.reshape(1, 2))
+            title_texts[i].set_text(
+                f"Example {example_index + 1} - {method_name}\n"
+                f"Success: {result['success']} | Steps: {result['iterations']}"
+            )
 
-            updated_lines.extend([arm_lines[i], path_lines[i]])
+            updated_lines.extend(
+                [arm_lines[i], path_lines[i], target_markers[i], title_texts[i]]
+            )
 
         return updated_lines
 
     animation = FuncAnimation(
         fig,
         update,
-        frames=num_frames,
+        frames=int(frame_offsets[-1]),
         interval=interval,
         blit=True,
     )
