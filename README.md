@@ -1,26 +1,30 @@
-# Simulated Robot Arm: Analytical, Numerical, and Neural Inverse Kinematics
+# Simulated Robot Arm - Analytical, Numerical, and Neural IK
 
-This project is a from-scratch study of inverse kinematics (IK) for planar 2-link and 3-link robot arms. I built it in phases so every new method had a simpler baseline to compare against: forward kinematics, exact analytical IK, iterative Jacobian IK, and finally learned neural IK.
+## Why I started this project
 
-The goal is not to claim that neural networks are always better. The goal is to understand when a learned policy can approximate a classical IK controller, where it fails, and what changes make it reliable.
+I started this project because I was interested in neural networks and wanted a good excuse to properly learn how they work. Since I study cybernetics and robotics, inverse kinematics felt like a useful problem where I could combine robotics, mathematics, programming, and machine learning.
+
+I did not want to begin by training a network without understanding the problem it was solving. I therefore built the project step by step. I first implemented forward kinematics, then analytical and numerical inverse kinematics, and only then started using neural networks.
+
+The goal was never to prove that neural networks are always better. I wanted to compare them with normal robotics methods and understand both their advantages and their weaknesses.
 
 ## Final results
 
-### 2-link IK
+### 2-link arm
 
-The 2-link comparison uses 1,000 test targets. Neural inference is performed as one batch, so its timing represents throughput rather than single-request latency.
+The comparison uses 1,000 test targets. The neural network processes all 1,000 targets in one batch, so its time represents batch throughput and not the delay of one individual request.
 
-| Method | Mean EE error | Median error | Max error | Mean compute time per target |
+| Method | Mean EE error | Median error | Max error | Mean time per target |
 |---|---:|---:|---:|---:|
 | Analytical IK | 0.00000000 | 0.00000000 | 0.00000000 | 0.065675 ms |
 | Numerical IK | 0.00000720 | 0.00000695 | 0.00001000 | 1.512989 ms |
 | Neural IK | 0.02368196 | 0.01765885 | 0.14164296 | **0.001132 ms** |
 
-Analytical IK is exact and numerical IK is extremely accurate. The restricted neural model is less accurate, but demonstrates the throughput advantage of batched inference.
+The results were mostly what I expected. Analytical IK was exact, while numerical IK was extremely accurate but needed several iterations. The neural network was much less accurate, but very fast when many targets were processed together.
 
-### 3-link IK
+### 3-link arm
 
-The 3-link comparison uses 1,000 fresh random targets and starting poses. Every method receives the same problems, a tolerance of `0.05`, and a maximum of 100 steps. Timing measures one complete solve at a time on CPU.
+This comparison uses 1,000 new random targets and starting angles. Every solver gets the same problems, a tolerance of `0.05`, and a maximum of 100 steps. The timing is for solving one complete IK problem at a time on CPU.
 
 | Method | Success | Mean error | Median error | Max error | Mean steps | Mean solve time |
 |---|---:|---:|---:|---:|---:|---:|
@@ -28,126 +32,165 @@ The 3-link comparison uses 1,000 fresh random targets and starting poses. Every 
 | DLS IK | 100.0% | 0.036583 | 0.035838 | 0.049914 | 6.89 | **0.54 ms** |
 | Neural policy | 95.9% | 0.039970 | 0.041381 | 0.094050 | 12.73 | 6.15 ms |
 
-The neural policy became competitive in success and error, but did not beat the classical methods. Its rollout needs more steps and repeated small PyTorch calls, so it is slower for this small single-target problem.
+The neural policy became quite accurate, but the classical solvers were still faster and more reliable. This also made sense after looking at the implementation. The neural policy must run the network repeatedly, while the numerical solvers only perform a few small matrix calculations.
 
 ![3-link solver comparison](results/phase8/ik_3link_solver_comparison.gif)
 
-## Phase-by-phase development
+## Development process
 
 ### Phase 0 - Setup
 
-The repository was separated into arms, solvers, models, training, experiments, visualization, tests, data, and results. Generated datasets and model weights are ignored by Git, while small benchmark and visualization artifacts are kept.
+I separated the project into folders for the robot arms, solvers, neural models, training, experiments, tests, data, results, and visualization. Generated datasets and model weights are not stored in Git because they can be recreated.
 
 ### Phase 1 - 2-link forward kinematics
 
-Forward kinematics answers: given the joint angles, where are the joints and end effector?
+Forward kinematics calculates the end-effector position when the joint angles are already known.
 
-```text
-x = L1 cos(theta1) + L2 cos(theta1 + theta2)
-y = L1 sin(theta1) + L2 sin(theta1 + theta2)
-```
+For a 2-link arm:
 
-The second link uses the cumulative angle `theta1 + theta2`. Static plotting, animation, and tests were added before attempting inverse kinematics.
+$$
+\begin{aligned}
+x &= L_1\cos(\theta_1) + L_2\cos(\theta_1 + \theta_2) \\
+y &= L_1\sin(\theta_1) + L_2\sin(\theta_1 + \theta_2)
+\end{aligned}
+$$
+
+An important point for me was understanding that the second link angle is cumulative. Its global angle is $\theta_1 + \theta_2$, not only $\theta_2$.
+
+I also made static plots, an animation, and tests. Forward kinematics later became the main way to check whether an IK solution was actually correct.
 
 ### Phase 2 - 2-link analytical IK
 
-Analytical IK reverses the mapping: given `(x, y)`, calculate the angles directly. I derived `theta2` with the law of cosines, then derived `theta1` from the target direction and the triangle formed by the links.
+Analytical IK does the opposite: the target position is known, and the goal is to calculate the angles directly.
 
-The implementation handles reachability, elbow-up and elbow-down branches, the folded special case, and verification through forward kinematics. This became the exact baseline, although a convenient closed-form solution does not generalize to every robot geometry.
+I used the law of cosines to find $\theta_2$:
+
+$$
+\cos(\theta_2) =
+\frac{x^2 + y^2 - L_1^2 - L_2^2}{2L_1L_2}
+$$
+
+I then used the direction to the target and the triangle between the two links to find $\theta_1$. The implementation checks whether the target can be reached and returns both elbow-up and elbow-down solutions.
+
+This method is exact and fast, but the derivation depends on the arm geometry. More complicated robots do not always have a simple analytical solution.
 
 ### Phase 3 - 2-link numerical IK
 
-The numerical solver uses the Jacobian:
+The numerical solver was my introduction to using the Jacobian for IK. The basic relationship is:
 
-```text
-delta_position = J * delta_theta
-```
+$$
+\Delta p = J\Delta\theta
+$$
 
-The Jacobian describes how small joint changes affect the end effector. Because the desired Cartesian error is known, the update is approximated with the Moore-Penrose pseudoinverse:
+The Jacobian describes how small changes in the joint angles change the end-effector position. Since I know the desired Cartesian error, I use the pseudoinverse to calculate a joint correction:
 
-```text
-error = target_position - current_position
-delta_theta = J_pinv * error
-theta = theta + learning_rate * delta_theta
-```
+$$
+\begin{aligned}
+e &= p_{target} - p_{current} \\
+\Delta\theta &= J^+ e \\
+\theta_{next} &= \theta + \alpha\Delta\theta
+\end{aligned}
+$$
 
-The learning rate reduces overshoot, and angles are wrapped to `[-pi, pi]`. Unlike analytical IK, this method is approximate, iterative, and dependent on the initial guess. It behaves like a proportional feedback controller: observe the remaining error, apply a correction, and repeat.
+Here, $\alpha$ is the learning rate. It makes each update smaller and helps avoid overshooting. The solver repeats this process until the error is small enough or the maximum number of iterations is reached.
 
-### Phase 4 - 2-link neural IK sanity check
+Unlike analytical IK, the numerical method is approximate and depends on the initial guess. I understood it as something similar to a proportional controller: measure the error, calculate a correction, and repeat.
 
-The first neural model learns:
+### Phase 4 - 2-link neural IK
 
-```text
-[target_x, target_y] -> [theta1, theta2]
-```
+The first neural network was mainly a sanity check. It learned the mapping:
 
-IK can have multiple correct angle solutions, which makes supervised labels ambiguous. I restricted the generated configurations to one consistent branch:
+$$
+(x_{target}, y_{target}) \longrightarrow (\theta_1, \theta_2)
+$$
 
-```text
-theta1 in [-pi/2, pi/2]
-theta2 in [0, pi]
-```
+One problem is that the same target can have more than one correct IK solution. To avoid giving the network contradictory answers, I restricted the generated angles to one branch:
 
-The network is `2 -> 64 -> 64 -> 2`. The handwritten notes follow the full training logic: affine layers, ReLU, mean squared error, backpropagation, and parameter updates. It was trained with Adam and MSE on 50,000 examples split into training, validation, and test data.
+$$
+\theta_1 \in [-\pi/2, \pi/2],
+\qquad
+\theta_2 \in [0, \pi]
+$$
 
-Training and validation loss stayed close, so there was no strong evidence of overfitting. Angle MSE was not treated as the final metric; predicted angles were evaluated by their resulting end-effector error.
+The network architecture was `2 -> 64 -> 64 -> 2`. I used this part of the project to learn about linear layers, ReLU, mean squared error, backpropagation, and the Adam optimizer.
+
+The network was trained on 50,000 examples. Training and validation loss stayed close, so there was no clear sign of overfitting. Still, low angle loss was not enough by itself. I also checked the actual end-effector error after applying the predicted angles.
 
 ![2-link neural IK loss](results/phase4/neural_ik_2link_losses.png)
 
 ### Phase 5 - 3-link forward kinematics
 
-The third link adds another cumulative angle:
+The 3-link arm uses the same idea as the 2-link arm, but with one more cumulative angle:
 
-```text
-link 1 angle = theta1
-link 2 angle = theta1 + theta2
-link 3 angle = theta1 + theta2 + theta3
-```
+$$
+\begin{aligned}
+x &= L_1\cos(\theta_1)
+   + L_2\cos(\theta_1+\theta_2)
+   + L_3\cos(\theta_1+\theta_2+\theta_3) \\
+y &= L_1\sin(\theta_1)
+   + L_2\sin(\theta_1+\theta_2)
+   + L_3\sin(\theta_1+\theta_2+\theta_3)
+\end{aligned}
+$$
 
-This established and tested the geometry used by every later 3-link solver.
+This geometry was tested before moving on to the 3-link solvers.
 
 ### Phase 6 - 3-link numerical IK
 
-The task still controls a 2D position, but there are now three joints. The Jacobian is `2 x 3`, which makes the arm redundant: many configurations can reach the same target.
+The end effector still moves in 2D, but there are now three joint angles. The Jacobian therefore has shape $2 \times 3$. This means the arm is redundant: several different angle combinations can reach the same target.
 
-The pseudoinverse chooses one local update, but can generate large corrections near singular or poorly conditioned configurations. I therefore added damped least squares (DLS), related to the Levenberg-Marquardt method:
+The pseudoinverse update is still:
 
-```text
-delta_theta = J.T * inverse(J * J.T + lambda^2 * I) * error
-```
+$$
+\Delta\theta = J^+e
+$$
 
-The damping value trades some aggressiveness for stability. A small value resembles the pseudoinverse; a larger value suppresses extreme updates but can slow convergence. DLS became the neural policy's teacher because it was the more stable classical controller.
+The pseudoinverse can give very large updates near singular configurations. To make the solver more stable, I also implemented damped least squares (DLS):
 
-### Phase 7 - 3-link policy dataset
+$$
+\Delta\theta =
+J^T\left(JJ^T + \lambda^2 I\right)^{-1}e
+$$
 
-A direct mapping is inappropriate for a redundant arm:
+The damping value $\lambda$ controls the tradeoff. A small value behaves more like the pseudoinverse, while a larger value reduces large updates but may make the solver slower or less precise.
 
-```text
-[target_x, target_y] -> [theta1, theta2, theta3]
-```
+DLS was chosen as the teacher for the neural policy because it behaved more reliably near difficult configurations.
 
-The same target can have many correct angle vectors, creating contradictory labels. Instead, the network learns a local controller:
+### Phase 7 - Dataset for the 3-link neural policy
 
-```text
-[target_x, target_y, current_theta1, current_theta2, current_theta3]
-    -> [delta_theta1, delta_theta2, delta_theta3]
-```
+For the redundant 3-link arm, this direct mapping is ambiguous:
 
-One neural call predicts one movement, not a complete IK solution. During rollout, predictions are repeatedly applied until the target tolerance or step limit is reached.
+$$
+(x_{target}, y_{target})
+\longrightarrow
+(\theta_1, \theta_2, \theta_3)
+$$
+
+There can be many correct output angles for one target. Instead, I trained the network to predict one movement from the current state:
+
+$$
+(x_{target}, y_{target}, \theta_1, \theta_2, \theta_3)
+\longrightarrow
+(\Delta\theta_1, \Delta\theta_2, \Delta\theta_3)
+$$
+
+The network is therefore one-shot for each movement, but not one-shot for the complete IK problem. During rollout, the prediction is applied repeatedly.
 
 The final dataset contains 200,000 samples:
 
 - 160,000 training samples from complete DLS trajectories.
 - 20,000 validation samples from separately generated trajectories.
-- 20,000 test samples where every row is a fresh random target and starting pose.
+- 20,000 test samples where every row starts a new random IK problem.
 
-The splits are generated separately so neighboring steps from one trajectory cannot leak into both training and evaluation. DLS and neural updates are capped at a joint-step norm of `0.5` for stability.
+The splits are generated separately so that neighboring states from the same trajectory cannot appear in both training and testing. DLS and neural updates are also limited to a joint-step norm of `0.5` to avoid very large movements.
 
-### Phase 8 - 3-link neural policy and rollout
+### Phase 8 - Training and improving the 3-link policy
 
 #### First attempt
 
-The first policy used raw target coordinates and raw angles with a `5 -> 128 -> 128 -> 3` network. It imitated individual DLS steps reasonably well, but complete rollout was poor:
+The first policy used raw target coordinates and raw joint angles with a `5 -> 128 -> 128 -> 3` network.
+
+It learned useful individual movements, but complete rollout was bad:
 
 | Metric | First policy |
 |---|---:|
@@ -155,31 +198,40 @@ The first policy used raw target coordinates and raw angles with a `5 -> 128 -> 
 | Mean final error | 0.4415 |
 | Mean rollout steps | 89.51 |
 
-This was the most important negative result. Good one-step imitation did not guarantee a good closed-loop controller. Prediction errors accumulated, pushing the policy into states poorly represented by isolated random samples.
+I expected repeated predictions to behave similarly to the DLS solver. Instead, small prediction mistakes accumulated. The network eventually reached states that were not well represented by the original isolated training samples.
 
 #### Improved policy
 
-The improvement came from redesigning the learning problem, not only adding neurons. The raw five-value input is converted inside the model into eight features:
+The main improvement was changing what the network learned from, not only making it larger.
 
-```text
-normalized_error_x, normalized_error_y,
-sin(theta1), cos(theta1),
-sin(theta2), cos(theta2),
-sin(theta3), cos(theta3)
-```
+The original five inputs are converted inside the model into:
 
-Cartesian error directly represents the movement still required. Sine and cosine avoid the discontinuity between `-pi` and `pi`, where nearly identical physical angles otherwise appear numerically far apart.
+$$
+\left[
+\frac{e_x}{6},
+\frac{e_y}{6},
+\sin\theta_1, \cos\theta_1,
+\sin\theta_2, \cos\theta_2,
+\sin\theta_3, \cos\theta_3
+\right]
+$$
 
-The final architecture is `8 -> 256 -> 256 -> 256 -> 3`. Training uses a combined objective:
+Cartesian error tells the network which direction the arm still needs to move. Sine and cosine avoid the numerical jump between $-\pi$ and $\pi$.
 
-```text
-total loss = DLS update imitation loss
-           + 0.1 * end-effector loss after the predicted update
-```
+The final network is `8 -> 256 -> 256 -> 256 -> 3`. It uses a combined loss:
 
-The imitation term teaches the DLS correction. The task term checks what the correction physically does. Training uses Adam, a batch size of 512, and 50 epochs.
+$$
+\mathcal{L}_{total}
+=
+\mathcal{L}_{DLS}
++ 0.1\mathcal{L}_{EE}
+$$
 
-An early evaluation produced 99.4% success, but I rejected it after finding trajectory leakage: neighboring states from one trajectory had been divided between training and test data, and many test states were already close to the target. Separately generated splits and fresh test starts produced the honest final rate of 95.9%.
+The first term teaches the network to copy the DLS update. The second term checks whether the predicted update actually moves the end effector in a useful direction.
+
+The model was trained for 50 epochs with a batch size of 512. The final result was 95.9% success and a mean final error of 0.0400.
+
+An earlier evaluation gave 99.4% success, but this result was not valid. Steps from the same trajectory had leaked into both training and testing, and many test states were already close to the target. I regenerated the splits separately and used fresh random starts for the final comparison.
 
 ![3-link neural IK combined loss](results/phase8/neural_ik_3link_losses.png)
 
@@ -187,23 +239,19 @@ An early evaluation produced 99.4% success, but I rejected it after finding traj
 
 ### Phase 9 - Final comparison
 
-The final comparison follows the same structure as the 2-link experiment. It loads saved test inputs, gives every method the same target and starting angles, records errors and timings, and summarizes 1,000 samples.
+The final experiment follows the same basic structure as the earlier 2-link comparison. It loads test inputs, gives every solver the same targets and starting angles, records the errors and times, and prints a summary over 1,000 samples.
 
-The results support a balanced conclusion:
-
-- Analytical IK is ideal when a closed form exists.
-- Pseudoinverse and DLS are accurate and efficient general baselines.
-- Neural rollout quality depends strongly on training distribution and state representation.
-- Neural inference is extremely fast when independent inputs are batched, as shown by the 2-link experiment.
-- A small sequential 3-link problem does not automatically benefit from neural inference because repeated single-sample calls add overhead.
+The main conclusion is that the neural policy now works well, but the classical methods are still better for this small problem. Neural inference becomes especially fast when many independent inputs are processed as a batch, as shown by the 2-link experiment. The 3-link policy is iterative, so it does not get the same speed advantage in the current implementation.
 
 ### Phase 10 - Visualization and documentation
 
-The final stage packages the work so the behavior is visible rather than represented only by numbers. The repository includes normal and logarithmic loss plots, a neural rollout path with error history, and a side-by-side GIF of pseudoinverse, DLS, and neural IK solving the same target. The complete implementation is covered by 20 tests.
+The final stage was to make the results understandable without only looking at printed numbers. The project includes loss plots, a rollout error plot, and a side-by-side GIF where pseudoinverse IK, DLS, and the neural policy solve the same problem.
 
-## Handwritten learning notes
+The implementation currently has 20 tests.
 
-The `notes/` directory contains the derivations and explanations used while building the project:
+## Handwritten notes
+
+The notes I made while learning the methods are included in `notes/`:
 
 - [Analytical 2-link IK](<notes/Analytical 2 Link.pdf>)
 - [Numerical 2-link IK](<notes/Numerical Solver 2 Link.pdf>)
@@ -216,14 +264,14 @@ The `notes/` directory contains the derivations and explanations used while buil
 ```text
 arms/           Forward kinematics and arm geometry
 data/           Dataset generation and splitting
-experiments/    Runnable demonstrations, plots, and comparisons
-models/         PyTorch neural-network definitions
-notes/          Handwritten derivations and learning notes
+experiments/    Demonstrations, plots, and comparisons
+models/         PyTorch neural networks
+notes/          Handwritten derivations and explanations
 results/        Saved plots, GIFs, and comparison tables
-solvers/        Analytical, numerical, DLS, and neural IK solvers
-tests/          Kinematics, solver, dataset, and training tests
-training/       Shared training utilities and entry points
-visualization/  Static and animated visualization helpers
+solvers/        Analytical, numerical, DLS, and neural IK
+tests/          Tests for geometry, solvers, data, and training
+training/       Shared training code and entry points
+visualization/  Plotting and animation helpers
 ```
 
 ## Running the project
@@ -235,7 +283,7 @@ python -m pip install -r requirements.txt
 python -m pytest
 ```
 
-Generate, train, and evaluate the 2-link model:
+Run the 2-link neural experiment:
 
 ```powershell
 python -m experiments.phase4_generate_dataset
@@ -244,7 +292,7 @@ python -m experiments.phase4_plot_losses
 python -m experiments.phase4_compare_ik_methods
 ```
 
-Generate, train, and evaluate the 3-link policy:
+Run the 3-link neural-policy experiment:
 
 ```powershell
 python -m experiments.phase7_generate_dataset_3link
@@ -253,30 +301,31 @@ python -m experiments.phase8_plot_losses
 python -m experiments.phase8_evaluate_neural_policy
 ```
 
-Datasets and trained weights are generated locally and intentionally excluded from Git.
+Datasets and trained weights are generated locally and are not included in Git.
 
 ## Scope and limitations
 
-This is an educational simulation and algorithm benchmark, not a production robot controller.
+This is an educational simulation, not a controller for a physical robot.
 
-- Links are ideal zero-thickness line segments.
-- Joints are treated as continuous and angles are wrapped to `[-pi, pi]`.
-- Mechanical stops, self-collision, obstacles, torque, acceleration, and dynamics are not modeled.
-- The 3-link policy is trained for unit link lengths and the sampled reachable workspace.
-- Timing depends on hardware and implementation. NumPy and PyTorch execute heavy kernels in compiled native code, while Python coordinates the experiment.
-- The 2-link neural timing measures batched throughput; the 3-link timing measures sequential complete-solve latency.
+- The links are zero-thickness lines.
+- Joints are treated as continuous and angles are wrapped to $[-\pi, \pi]$.
+- Joint limits, self-collision, obstacles, torque, acceleration, and dynamics are not included.
+- The 3-link neural policy is trained for unit link lengths and the sampled workspace.
+- Timing depends on the computer and implementation.
+- NumPy and PyTorch perform their main numerical calculations in compiled code, while Python controls the experiment.
+- The 2-link neural timing measures batch throughput. The 3-link timing measures the time for one complete sequential solve.
 
-Collision-aware movement would require robot geometry, interpolated collision checks, and a constraint-aware teacher or planner. That is a separate motion-planning problem rather than an omitted part of this position-IK benchmark.
+Collision-free movement would require robot geometry, collision checking between each pose, and a teacher or planner that understands these constraints. I consider that a separate motion-planning problem rather than part of this IK comparison.
 
-## Main lessons
+## What I learned
 
-- Forward kinematics is the foundation for verifying every IK method.
-- Analytical IK is exact and fast but specific to geometry.
-- Numerical IK is iterative, initialization-dependent, and broadly applicable.
-- DLS trades aggressiveness for stability near singular configurations.
-- Redundancy makes direct supervised IK targets ambiguous.
-- One-step validation loss is insufficient for an iterative controller.
-- Training data must represent states encountered during rollout.
-- Better features and task-aware loss mattered more than network width alone.
-- Data leakage briefly made the neural policy look better than it really was.
-- The improved neural policy is credible, but classical solvers remain faster and slightly more reliable for this small problem.
+- Forward kinematics is needed to verify every IK result.
+- Analytical IK is exact and fast, but depends on the robot geometry.
+- Numerical IK is iterative and depends on the starting angles.
+- DLS is more stable near difficult or singular configurations.
+- Redundancy makes direct supervised IK outputs ambiguous.
+- Low one-step neural loss does not guarantee a successful rollout.
+- Training data should include the states the policy will actually visit.
+- Better inputs and a useful loss function mattered more than only increasing the network size.
+- Incorrect dataset splitting can make a model look better than it really is.
+- The neural policy became useful, but the classical methods are still the best choice for this small IK problem.
