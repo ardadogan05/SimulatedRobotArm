@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
+from data.dataset_utils import split_dataset
 from data.generate_2link_dataset import generate_2link_dataset
 
 
@@ -13,23 +14,6 @@ def plot_dataset(X):
     plt.ylabel("y")
     plt.title("2-link IK dataset target positions")
     plt.show()
-
-
-def split_dataset(X, Y): #Will use 40k for training, 5k for val and 5k for test.
-    indices = np.random.permutation(len(X)) #random shuffle of indices
-
-    train_end = int(0.8 * len(X)) #80% of data goes to training
-    val_end = int(0.9 * len(X)) #10% to validation
-
-    train_idx = indices[:train_end]
-    val_idx = indices[train_end:val_end]
-    test_idx = indices[val_end:]
-
-    X_train, Y_train = X[train_idx], Y[train_idx]
-    X_val, Y_val = X[val_idx], Y[val_idx]
-    X_test, Y_test = X[test_idx], Y[test_idx]
-
-    return X_train, Y_train, X_val, Y_val, X_test, Y_test
 
 
 def main():

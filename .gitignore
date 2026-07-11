@@ -7,3 +7,4 @@ data/processed/*.npz
 models/saved/*.pt
 models/saved/*.pth
 results/phase4/*.npz
+results/phase8/*.npz

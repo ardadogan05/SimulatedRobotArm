@@ -117,6 +117,9 @@ def dls_step_3link(
     return learning_rate * delta_theta, error_norm
 
 
+#Making the each step explicit with this function allows us to generate a dataset
+#So that we can train a NN to mimick each step the deterministic numerical solver takes
+#Instead of trying to "oneshot" the output from input
 def dls_solver_3link(
     target,
     L1=1.0,

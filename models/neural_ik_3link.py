@@ -17,6 +17,6 @@ class NeuralIK3Link(nn.Module):
         ) #Full network is now stored in self.network
 
     #Runs input through the entire network.
-    #Returns predicted angles.
+    #Returns predicted delta theta updates.
     def forward(self, x):
         return self.network(x)
