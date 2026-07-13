@@ -1,7 +1,5 @@
 # Simulated Robot Arm - Analytical, Numerical, and Neural IK
 
-> **Documentation note:** I used conversations with GPT-5.5 throughout the project to question my ideas and organize what I learned. The implementation, experiments, handwritten derivations, and conclusions are my own work. GPT-5.6 Sol generated the final README from this material.
-
 ## Why I started this project
 
 I started this project because I was interested in neural networks and wanted a good excuse to properly learn how they work. Since I study cybernetics and robotics, inverse kinematics felt like a useful problem where I could combine robotics, mathematics, programming, and machine learning.
@@ -311,3 +309,7 @@ Collision-free movement would require robot geometry, collision checking between
 - Better inputs and a useful loss function mattered more than only increasing the network size.
 - Incorrect dataset splitting can make a model look better than it really is.
 - The neural policy became useful, but the classical methods are still the best choice for this small IK problem.
+
+## Documentation note
+
+I used conversations with GPT-5.5 throughout the project to question my ideas and organize what I learned. The implementation, experiments, handwritten derivations, and conclusions are my own work. GPT-5.6 Sol generated the final README from this material.
