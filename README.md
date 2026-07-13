@@ -50,7 +50,9 @@ Forward kinematics calculates the end-effector position when the joint angles ar
 
 For a 2-link arm:
 
-$$ \begin{aligned} x &= L_1\cos(\theta_1) + L_2\cos(\theta_1 + \theta_2) \\ y &= L_1\sin(\theta_1) + L_2\sin(\theta_1 + \theta_2) \end{aligned} $$
+$$ x = L_1\cos(\theta_1) + L_2\cos(\theta_1 + \theta_2) $$
+
+$$ y = L_1\sin(\theta_1) + L_2\sin(\theta_1 + \theta_2) $$
 
 An important point for me was understanding that the second link angle is cumulative. Its global angle is $\theta_1 + \theta_2$, not only $\theta_2$.
 
@@ -66,7 +68,7 @@ $$ \cos(\theta_2) = \frac{x^2 + y^2 - L_1^2 - L_2^2}{2L_1L_2} $$
 
 I then used the direction to the target and the triangle between the two links to find $\theta_1$:
 
-$$ \theta_1 = \operatorname{atan2}(y, x) - \operatorname{atan2}\!\left(L_2\sin(\theta_2), L_1 + L_2\cos(\theta_2)\right) $$
+$$ \theta_1 = \mathrm{atan2}(y, x) - \mathrm{atan2}\left(L_2\sin(\theta_2), L_1 + L_2\cos(\theta_2)\right) $$
 
 Changing the sign of $\theta_2$ gives the other elbow configuration. The implementation checks whether the target can be reached and returns both elbow-up and elbow-down solutions.
 
@@ -76,7 +78,7 @@ This method is exact and fast, but the derivation depends on the arm geometry. M
 
 The numerical solver was my introduction to using the Jacobian for IK. The basic relationship is:
 
-$$ \Delta \mathbf{p} = J\,\Delta\boldsymbol{\theta} $$
+$$ \Delta \mathbf{p} = J\Delta\boldsymbol{\theta} $$
 
 The Jacobian contains the partial derivatives of the end-effector coordinates with respect to the joint angles:
 
@@ -84,7 +86,11 @@ $$ J = \begin{bmatrix} \dfrac{\partial x}{\partial \theta_1} & \dfrac{\partial x
 
 Since I know the desired Cartesian error, I use the pseudoinverse to calculate a joint correction:
 
-$$ \begin{aligned} \mathbf{e} &= \mathbf{p}_{\mathrm{target}} - \mathbf{p}_{\mathrm{current}} \\ \Delta\boldsymbol{\theta} &= J^+\mathbf{e} \\ \boldsymbol{\theta}_{\mathrm{next}} &= \boldsymbol{\theta} + \alpha\,\Delta\boldsymbol{\theta} \end{aligned} $$
+$$ \mathbf{e} = \mathbf{p}_{\mathrm{target}} - \mathbf{p}_{\mathrm{current}} $$
+
+$$ \Delta\boldsymbol{\theta} = J^+\mathbf{e} $$
+
+$$ \boldsymbol{\theta}_{\mathrm{next}} = \boldsymbol{\theta} + \alpha\Delta\boldsymbol{\theta} $$
 
 Here, $\alpha$ is the learning rate. It makes each update smaller and helps avoid overshooting. The solver repeats this process until the error is small enough or the maximum number of iterations is reached.
 
@@ -110,7 +116,9 @@ The network was trained on 50,000 examples. Training and validation loss stayed 
 
 The 3-link arm uses the same idea as the 2-link arm, but with one more cumulative angle:
 
-$$ \begin{aligned} x &= L_1\cos(\theta_1) + L_2\cos(\theta_1+\theta_2) + L_3\cos(\theta_1+\theta_2+\theta_3) \\ y &= L_1\sin(\theta_1) + L_2\sin(\theta_1+\theta_2) + L_3\sin(\theta_1+\theta_2+\theta_3) \end{aligned} $$
+$$ x = L_1\cos(\theta_1) + L_2\cos(\theta_1+\theta_2) + L_3\cos(\theta_1+\theta_2+\theta_3) $$
+
+$$ y = L_1\sin(\theta_1) + L_2\sin(\theta_1+\theta_2) + L_3\sin(\theta_1+\theta_2+\theta_3) $$
 
 This geometry was tested before moving on to the 3-link solvers.
 
@@ -124,7 +132,7 @@ $$ \Delta\boldsymbol{\theta} = J^+\mathbf{e} $$
 
 The pseudoinverse can give very large updates near singular configurations. To make the solver more stable, I also implemented damped least squares (DLS):
 
-$$ \Delta\boldsymbol{\theta} = J^T\!\left(JJ^T + \lambda^2 I\right)^{-1}\mathbf{e} $$
+$$ \Delta\boldsymbol{\theta} = J^T\left(JJ^T + \lambda^2 I\right)^{-1}\mathbf{e} $$
 
 The damping value $\lambda$ controls the tradeoff. A small value behaves more like the pseudoinverse, while a larger value reduces large updates but may make the solver slower or less precise.
 
@@ -178,7 +186,7 @@ Cartesian error tells the network which direction the arm still needs to move. S
 
 The final network is `8 -> 256 -> 256 -> 256 -> 3`. It uses a combined loss:
 
-$$ \mathcal{L}_{\mathrm{total}} = \mathcal{L}_{\mathrm{DLS}} + 0.1\,\mathcal{L}_{\mathrm{EE}} $$
+$$ \mathcal{L}_{\mathrm{total}} = \mathcal{L}_{\mathrm{DLS}} + 0.1\mathcal{L}_{\mathrm{EE}} $$
 
 The first term teaches the network to copy the DLS update. The second term checks whether the predicted update actually moves the end effector in a useful direction.
 
